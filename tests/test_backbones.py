@@ -1,6 +1,6 @@
 import torch
 
-from src.backbones import MIT_B0, MIT_B2, MixVisionTransformer
+from src.backbones import MIT_B0, MIT_B1, MIT_B2, MixVisionTransformer
 
 
 def test_mit_b0_feature_pyramid_shapes():
@@ -23,3 +23,12 @@ def test_mit_b2_feature_pyramid_shapes():
 
     assert len(outputs) == 4
     assert tuple(feature.shape[1] for feature in outputs) == MIT_B2.stage_channels
+
+
+def test_mit_b1_feature_pyramid_shapes():
+    model = MixVisionTransformer(MIT_B1)
+    x = torch.randn(2, 3, 64, 64)
+    outputs = model(x)
+
+    assert len(outputs) == 4
+    assert tuple(feature.shape[1] for feature in outputs) == MIT_B1.stage_channels

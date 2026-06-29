@@ -45,11 +45,71 @@ MIT_B0 = MiTSpec(
     drop_path_rate=0.1,
 )
 
+MIT_B1 = MiTSpec(
+    name="mit_b1",
+    embed_dims=64,
+    num_stages=4,
+    num_layers=(2, 2, 2, 2),
+    num_heads=(1, 2, 5, 8),
+    patch_sizes=(7, 3, 3, 3),
+    strides=(4, 2, 2, 2),
+    sr_ratios=(8, 4, 2, 1),
+    mlp_ratio=4,
+    drop_rate=0.0,
+    attn_drop_rate=0.0,
+    drop_path_rate=0.1,
+)
+
 MIT_B2 = MiTSpec(
     name="mit_b2",
     embed_dims=64,
     num_stages=4,
     num_layers=(3, 4, 6, 3),
+    num_heads=(1, 2, 5, 8),
+    patch_sizes=(7, 3, 3, 3),
+    strides=(4, 2, 2, 2),
+    sr_ratios=(8, 4, 2, 1),
+    mlp_ratio=4,
+    drop_rate=0.0,
+    attn_drop_rate=0.0,
+    drop_path_rate=0.1,
+)
+
+MIT_B3 = MiTSpec(
+    name="mit_b3",
+    embed_dims=64,
+    num_stages=4,
+    num_layers=(3, 4, 18, 3),
+    num_heads=(1, 2, 5, 8),
+    patch_sizes=(7, 3, 3, 3),
+    strides=(4, 2, 2, 2),
+    sr_ratios=(8, 4, 2, 1),
+    mlp_ratio=4,
+    drop_rate=0.0,
+    attn_drop_rate=0.0,
+    drop_path_rate=0.1,
+)
+
+MIT_B4 = MiTSpec(
+    name="mit_b4",
+    embed_dims=64,
+    num_stages=4,
+    num_layers=(3, 8, 27, 3),
+    num_heads=(1, 2, 5, 8),
+    patch_sizes=(7, 3, 3, 3),
+    strides=(4, 2, 2, 2),
+    sr_ratios=(8, 4, 2, 1),
+    mlp_ratio=4,
+    drop_rate=0.0,
+    attn_drop_rate=0.0,
+    drop_path_rate=0.1,
+)
+
+MIT_B5 = MiTSpec(
+    name="mit_b5",
+    embed_dims=64,
+    num_stages=4,
+    num_layers=(3, 6, 40, 3),
     num_heads=(1, 2, 5, 8),
     patch_sizes=(7, 3, 3, 3),
     strides=(4, 2, 2, 2),

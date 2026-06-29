@@ -9,6 +9,11 @@ class TrainDefaults:
     image_size: tuple[int, int] = (64, 64)
     num_classes: int = 4
     batch_size: int = 2
+    eval_batch_size: int = 2
+    train_num_workers: int = 0
+    val_num_workers: int = 0
+    pin_memory: bool = False
+    persistent_workers: bool = False
     optimizer_name: str = "adamw"
     learning_rate_backbone: float = 1e-5
     learning_rate_head: float = 1e-4
@@ -21,7 +26,11 @@ class TrainDefaults:
     min_lr: float = 0.0
     variant_name: str = MIT_B0.name
     task_mode: str = "single_task"
-    steps: int = 1
+    task_a_classes: int = 4
+    task_b_classes: int = 4
+    epochs: int = 1
+    max_train_batches: int | None = 1
+    max_eval_batches: int | None = 1
 
 
 DEFAULTS = TrainDefaults()
