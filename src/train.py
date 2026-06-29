@@ -7,7 +7,7 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader, Dataset
 
-from .backbones import MIT_B0, MIT_B1, MIT_B2, MIT_B3, MIT_B4, MIT_B5, MixVisionTransformer
+from .backbones import MixVisionTransformer, get_mit_spec
 from .configs import ConfigHandler, DataConfig, ExperimentConfig, ModelConfig, OptimizerConfig, SchedulerConfig
 from .datasets import (
     DummySegmentationDataset,
@@ -28,18 +28,7 @@ from .weighting import FixedLossWeighting
 
 
 def build_model_from_config(config: ModelConfig) -> nn.Module:
-    specs = {
-        MIT_B0.name: MIT_B0,
-        MIT_B1.name: MIT_B1,
-        MIT_B2.name: MIT_B2,
-        MIT_B3.name: MIT_B3,
-        MIT_B4.name: MIT_B4,
-        MIT_B5.name: MIT_B5,
-    }
-    if config.variant not in specs:
-        raise ValueError(f"Unsupported variant={config.variant}.")
-
-    spec = specs[config.variant]
+    spec = get_mit_spec(config.variant)
     decoder_kwargs = {
         "in_channels": spec.stage_channels,
         "embedding_dim": config.decoder_dim,

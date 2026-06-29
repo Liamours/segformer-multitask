@@ -3,6 +3,7 @@ from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
 from typing import Any
 
+from .backbones import SUPPORTED_MIT_SPECS
 from .defaults import DEFAULTS
 from .types import TaskClassCounts
 
@@ -174,10 +175,9 @@ class ConfigHandler:
 
     @staticmethod
     def validate(config: ExperimentConfig) -> None:
-        valid_variants = {"mit_b0", "mit_b1", "mit_b2", "mit_b3", "mit_b4", "mit_b5"}
         valid_task_modes = {"single_task", "dual_head", "dual_decoder"}
         valid_datasets = {"dummy", "folder"}
-        if config.model.variant not in valid_variants:
+        if config.model.variant not in SUPPORTED_MIT_SPECS:
             raise ValueError(f"Unsupported variant={config.model.variant}.")
         if config.model.task_mode not in valid_task_modes:
             raise ValueError(f"Unsupported task_mode={config.model.task_mode}.")

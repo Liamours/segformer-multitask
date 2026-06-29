@@ -120,6 +120,21 @@ MIT_B5 = MiTSpec(
     drop_path_rate=0.1,
 )
 
+SUPPORTED_MIT_SPECS: dict[str, MiTSpec] = {
+    MIT_B0.name: MIT_B0,
+    MIT_B1.name: MIT_B1,
+    MIT_B2.name: MIT_B2,
+    MIT_B3.name: MIT_B3,
+    MIT_B4.name: MIT_B4,
+    MIT_B5.name: MIT_B5,
+}
+
+
+def get_mit_spec(name: str) -> MiTSpec:
+    if name not in SUPPORTED_MIT_SPECS:
+        raise ValueError(f"Unsupported variant={name}.")
+    return SUPPORTED_MIT_SPECS[name]
+
 
 def drop_path(x: torch.Tensor, drop_prob: float, training: bool) -> torch.Tensor:
     if drop_prob == 0.0 or not training:
