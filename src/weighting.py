@@ -44,4 +44,3 @@ class DynamicWeightAverage:
             self.buffer[batch_idx] = detached
 
         return torch.stack([self.weights[key] * losses[key] for key in self.keys]).sum()
-

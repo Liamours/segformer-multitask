@@ -8,4 +8,3 @@ def segmentation_loss(
     ignore_index: int = 255,
 ) -> torch.Tensor:
     return F.cross_entropy(logits, target, ignore_index=ignore_index)
-

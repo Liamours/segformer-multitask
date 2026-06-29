@@ -4,4 +4,3 @@ import torch
 
 FeaturePyramid = Sequence[torch.Tensor]
 LossDict = dict[str, torch.Tensor]
-

@@ -17,4 +17,3 @@ class SegmentationHead(nn.Module):
         if output_size is not None and logits.shape[2:] != output_size:
             logits = F.interpolate(logits, size=output_size, mode="bilinear", align_corners=False)
         return logits
-

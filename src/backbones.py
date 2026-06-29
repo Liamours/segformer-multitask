@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 
-from segformer_multitask.types import FeaturePyramid
+from .types import FeaturePyramid
 
 
 @dataclass(frozen=True)
@@ -84,4 +84,3 @@ class MixVisionTransformer(PyramidBackbone):
             "MixVisionTransformer is scaffolded but not implemented yet. "
             "Next step: port the MiT backbone logic using mmsegmentation as the reference."
         )
-

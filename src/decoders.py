@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from segformer_multitask.types import FeaturePyramid
+from .types import FeaturePyramid
 
 
 class SegFormerDecoder(nn.Module):
@@ -43,4 +43,3 @@ class SegFormerDecoder(nn.Module):
 
         fused = self.fuse(torch.cat(projected, dim=1))
         return self.dropout(fused)
-

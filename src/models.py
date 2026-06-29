@@ -1,9 +1,9 @@
 import torch
 from torch import nn
 
-from segformer_multitask.backbones import PyramidBackbone
-from segformer_multitask.decoders import SegFormerDecoder
-from segformer_multitask.heads import SegmentationHead
+from .backbones import PyramidBackbone
+from .decoders import SegFormerDecoder
+from .heads import SegmentationHead
 
 
 class SingleTaskSegFormer(nn.Module):
@@ -71,4 +71,3 @@ class DualDecoderSegFormer(nn.Module):
             "task_a_logits": self.head_a(decoded_a, output_size=x.shape[2:]),
             "task_b_logits": self.head_b(decoded_b, output_size=x.shape[2:]),
         }
-
