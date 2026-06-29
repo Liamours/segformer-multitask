@@ -9,7 +9,14 @@ description = "SegFormer multitask research scaffold"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+  "numpy>=1.26",
   "torch>=2.2",
+  "tqdm>=4.66",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.2",
 ]
 
 [tool.setuptools.packages.find]

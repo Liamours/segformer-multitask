@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 from .types import FeaturePyramid
@@ -58,6 +59,160 @@ MIT_B2 = MiTSpec(
 )
 
 
+def drop_path(x: torch.Tensor, drop_prob: float, training: bool) -> torch.Tensor:
+    if drop_prob == 0.0 or not training:
+        return x
+    keep_prob = 1.0 - drop_prob
+    shape = (x.shape[0],) + (1,) * (x.ndim - 1)
+    random_tensor = keep_prob + torch.rand(shape, dtype=x.dtype, device=x.device)
+    random_tensor.floor_()
+    return x.div(keep_prob) * random_tensor
+
+
+class DropPath(nn.Module):
+    def __init__(self, drop_prob: float = 0.0) -> None:
+        super().__init__()
+        self.drop_prob = drop_prob
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return drop_path(x, self.drop_prob, self.training)
+
+
+class OverlapPatchEmbed(nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        embed_dim: int,
+        patch_size: int,
+        stride: int,
+    ) -> None:
+        super().__init__()
+        self.proj = nn.Conv2d(
+            in_channels,
+            embed_dim,
+            kernel_size=patch_size,
+            stride=stride,
+            padding=patch_size // 2,
+        )
+        self.norm = nn.LayerNorm(embed_dim)
+
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, tuple[int, int]]:
+        x = self.proj(x)
+        height, width = x.shape[2:]
+        x = x.flatten(2).transpose(1, 2)
+        x = self.norm(x)
+        return x, (height, width)
+
+
+class EfficientSelfAttention(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        num_heads: int,
+        sr_ratio: int,
+        attn_drop: float,
+        proj_drop: float,
+    ) -> None:
+        super().__init__()
+        if dim % num_heads != 0:
+            raise ValueError(f"dim={dim} must be divisible by num_heads={num_heads}.")
+
+        self.dim = dim
+        self.num_heads = num_heads
+        self.head_dim = dim // num_heads
+        self.scale = self.head_dim ** -0.5
+        self.sr_ratio = sr_ratio
+
+        self.q = nn.Linear(dim, dim)
+        self.kv = nn.Linear(dim, dim * 2)
+        self.proj = nn.Linear(dim, dim)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+        if sr_ratio > 1:
+            self.sr = nn.Conv2d(dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
+            self.norm = nn.LayerNorm(dim)
+        else:
+            self.sr = None
+            self.norm = None
+
+    def forward(self, x: torch.Tensor, spatial_shape: tuple[int, int]) -> torch.Tensor:
+        batch_size, num_tokens, dim = x.shape
+        q = self.q(x).reshape(batch_size, num_tokens, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
+
+        if self.sr is not None:
+            height, width = spatial_shape
+            x_kv = x.transpose(1, 2).reshape(batch_size, dim, height, width)
+            x_kv = self.sr(x_kv).reshape(batch_size, dim, -1).transpose(1, 2)
+            x_kv = self.norm(x_kv)
+        else:
+            x_kv = x
+
+        kv = self.kv(x_kv).reshape(batch_size, -1, 2, self.num_heads, self.head_dim)
+        kv = kv.permute(2, 0, 3, 1, 4)
+        k, v = kv[0], kv[1]
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+
+        out = (attn @ v).transpose(1, 2).reshape(batch_size, num_tokens, dim)
+        out = self.proj(out)
+        return self.proj_drop(out)
+
+
+class MixFFN(nn.Module):
+    def __init__(self, dim: int, hidden_dim: int, drop: float) -> None:
+        super().__init__()
+        self.fc1 = nn.Conv2d(dim, hidden_dim, kernel_size=1)
+        self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, padding=1, groups=hidden_dim)
+        self.act = nn.GELU()
+        self.fc2 = nn.Conv2d(hidden_dim, dim, kernel_size=1)
+        self.drop = nn.Dropout(drop)
+
+    def forward(self, x: torch.Tensor, spatial_shape: tuple[int, int]) -> torch.Tensor:
+        batch_size, _, channels = x.shape
+        height, width = spatial_shape
+        out = x.transpose(1, 2).reshape(batch_size, channels, height, width)
+        out = self.fc1(out)
+        out = self.dwconv(out)
+        out = self.act(out)
+        out = self.drop(out)
+        out = self.fc2(out)
+        out = self.drop(out)
+        return out.flatten(2).transpose(1, 2)
+
+
+class TransformerBlock(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        num_heads: int,
+        mlp_ratio: int,
+        sr_ratio: int,
+        drop: float,
+        attn_drop: float,
+        drop_path_prob: float,
+    ) -> None:
+        super().__init__()
+        self.norm1 = nn.LayerNorm(dim)
+        self.attn = EfficientSelfAttention(
+            dim=dim,
+            num_heads=num_heads,
+            sr_ratio=sr_ratio,
+            attn_drop=attn_drop,
+            proj_drop=drop,
+        )
+        self.norm2 = nn.LayerNorm(dim)
+        self.mlp = MixFFN(dim=dim, hidden_dim=dim * mlp_ratio, drop=drop)
+        self.drop_path = DropPath(drop_path_prob)
+
+    def forward(self, x: torch.Tensor, spatial_shape: tuple[int, int]) -> torch.Tensor:
+        x = x + self.drop_path(self.attn(self.norm1(x), spatial_shape))
+        x = x + self.drop_path(self.mlp(self.norm2(x), spatial_shape))
+        return x
+
+
 class PyramidBackbone(nn.Module, ABC):
     @property
     @abstractmethod
@@ -75,12 +230,72 @@ class MixVisionTransformer(PyramidBackbone):
         self.spec = spec
         self.in_channels = in_channels
 
+        drop_path_schedule = torch.linspace(0, spec.drop_path_rate, sum(spec.num_layers)).tolist()
+        cursor = 0
+        stage_in_channels = in_channels
+
+        self.patch_embeds = nn.ModuleList()
+        self.blocks = nn.ModuleList()
+        self.norms = nn.ModuleList()
+
+        for stage_index in range(spec.num_stages):
+            stage_dim = spec.stage_channels[stage_index]
+            self.patch_embeds.append(
+                OverlapPatchEmbed(
+                    in_channels=stage_in_channels,
+                    embed_dim=stage_dim,
+                    patch_size=spec.patch_sizes[stage_index],
+                    stride=spec.strides[stage_index],
+                )
+            )
+
+            stage_blocks = []
+            for block_index in range(spec.num_layers[stage_index]):
+                stage_blocks.append(
+                    TransformerBlock(
+                        dim=stage_dim,
+                        num_heads=spec.num_heads[stage_index],
+                        mlp_ratio=spec.mlp_ratio,
+                        sr_ratio=spec.sr_ratios[stage_index],
+                        drop=spec.drop_rate,
+                        attn_drop=spec.attn_drop_rate,
+                        drop_path_prob=drop_path_schedule[cursor + block_index],
+                    )
+                )
+            self.blocks.append(nn.ModuleList(stage_blocks))
+            self.norms.append(nn.LayerNorm(stage_dim))
+
+            cursor += spec.num_layers[stage_index]
+            stage_in_channels = stage_dim
+
+        self._init_weights()
+
     @property
     def out_channels(self) -> tuple[int, int, int, int]:
         return self.spec.stage_channels
 
+    def _init_weights(self) -> None:
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.trunc_normal_(module.weight, std=0.02)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+            elif isinstance(module, nn.LayerNorm):
+                nn.init.ones_(module.weight)
+                nn.init.zeros_(module.bias)
+            elif isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(module.weight, mode="fan_out", nonlinearity="relu")
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+
     def forward(self, x: torch.Tensor) -> FeaturePyramid:
-        raise NotImplementedError(
-            "MixVisionTransformer is scaffolded but not implemented yet. "
-            "Next step: port the MiT backbone logic using mmsegmentation as the reference."
-        )
+        outputs: list[torch.Tensor] = []
+        for patch_embed, stage_blocks, norm in zip(self.patch_embeds, self.blocks, self.norms, strict=True):
+            x, spatial_shape = patch_embed(x)
+            for block in stage_blocks:
+                x = block(x, spatial_shape)
+            x = norm(x)
+            height, width = spatial_shape
+            x = x.transpose(1, 2).reshape(x.shape[0], x.shape[2], height, width)
+            outputs.append(x)
+        return tuple(outputs)
