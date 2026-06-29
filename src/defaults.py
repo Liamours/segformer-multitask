@@ -9,9 +9,16 @@ class TrainDefaults:
     image_size: tuple[int, int] = (64, 64)
     num_classes: int = 4
     batch_size: int = 2
+    optimizer_name: str = "adamw"
     learning_rate_backbone: float = 1e-5
     learning_rate_head: float = 1e-4
+    betas: tuple[float, float] = (0.9, 0.999)
     weight_decay: float = 0.01
+    scheduler_name: str = "poly"
+    warmup_iters: int = 1500
+    warmup_ratio: float = 1e-6
+    poly_power: float = 1.0
+    min_lr: float = 0.0
     variant_name: str = MIT_B0.name
     task_mode: str = "single_task"
     steps: int = 1

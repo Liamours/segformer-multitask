@@ -7,6 +7,8 @@ from torch import nn
 
 from .types import FeaturePyramid
 
+LAYER_NORM_EPS = 1e-6
+
 
 @dataclass(frozen=True)
 class MiTSpec:
@@ -94,7 +96,7 @@ class OverlapPatchEmbed(nn.Module):
             stride=stride,
             padding=patch_size // 2,
         )
-        self.norm = nn.LayerNorm(embed_dim)
+        self.norm = nn.LayerNorm(embed_dim, eps=LAYER_NORM_EPS)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, tuple[int, int]]:
         x = self.proj(x)
@@ -131,7 +133,7 @@ class EfficientSelfAttention(nn.Module):
 
         if sr_ratio > 1:
             self.sr = nn.Conv2d(dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
-            self.norm = nn.LayerNorm(dim)
+            self.norm = nn.LayerNorm(dim, eps=LAYER_NORM_EPS)
         else:
             self.sr = None
             self.norm = None
@@ -195,7 +197,7 @@ class TransformerBlock(nn.Module):
         drop_path_prob: float,
     ) -> None:
         super().__init__()
-        self.norm1 = nn.LayerNorm(dim)
+        self.norm1 = nn.LayerNorm(dim, eps=LAYER_NORM_EPS)
         self.attn = EfficientSelfAttention(
             dim=dim,
             num_heads=num_heads,
@@ -203,7 +205,7 @@ class TransformerBlock(nn.Module):
             attn_drop=attn_drop,
             proj_drop=drop,
         )
-        self.norm2 = nn.LayerNorm(dim)
+        self.norm2 = nn.LayerNorm(dim, eps=LAYER_NORM_EPS)
         self.mlp = MixFFN(dim=dim, hidden_dim=dim * mlp_ratio, drop=drop)
         self.drop_path = DropPath(drop_path_prob)
 
@@ -263,7 +265,7 @@ class MixVisionTransformer(PyramidBackbone):
                     )
                 )
             self.blocks.append(nn.ModuleList(stage_blocks))
-            self.norms.append(nn.LayerNorm(stage_dim))
+            self.norms.append(nn.LayerNorm(stage_dim, eps=LAYER_NORM_EPS))
 
             cursor += spec.num_layers[stage_index]
             stage_in_channels = stage_dim
@@ -284,7 +286,9 @@ class MixVisionTransformer(PyramidBackbone):
                 nn.init.ones_(module.weight)
                 nn.init.zeros_(module.bias)
             elif isinstance(module, nn.Conv2d):
-                nn.init.kaiming_normal_(module.weight, mode="fan_out", nonlinearity="relu")
+                fan_out = module.kernel_size[0] * module.kernel_size[1] * module.out_channels
+                fan_out //= module.groups
+                nn.init.normal_(module.weight, mean=0.0, std=(2.0 / fan_out) ** 0.5)
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
 

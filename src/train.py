@@ -2,6 +2,7 @@ from dataclasses import asdict
 
 from torch import nn
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -22,7 +23,14 @@ def build_model(
     task_mode: str = "single_task",
     num_classes: int = 4,
 ) -> nn.Module:
-    spec = MIT_B0 if variant == MIT_B0.name else MIT_B2
+    specs = {
+        MIT_B0.name: MIT_B0,
+        MIT_B2.name: MIT_B2,
+    }
+    if variant not in specs:
+        raise ValueError(f"Unsupported variant={variant}.")
+
+    spec = specs[variant]
     backbone = MixVisionTransformer(spec)
     decoder = SegFormerDecoder(spec.stage_channels)
 
@@ -65,8 +73,26 @@ def build_optimizer(model: nn.Module) -> AdamW:
             {"params": backbone_params, "lr": DEFAULTS.learning_rate_backbone},
             {"params": head_params, "lr": DEFAULTS.learning_rate_head},
         ],
+        betas=DEFAULTS.betas,
         weight_decay=DEFAULTS.weight_decay,
     )
+
+
+def build_scheduler(optimizer: AdamW, total_steps: int) -> LambdaLR:
+    warmup_iters = max(1, DEFAULTS.warmup_iters)
+    total_steps = max(total_steps, warmup_iters)
+
+    def lr_lambda(step: int) -> float:
+        current_step = step + 1
+        if current_step <= warmup_iters:
+            progress = current_step / warmup_iters
+            return DEFAULTS.warmup_ratio + progress * (1.0 - DEFAULTS.warmup_ratio)
+
+        progress = (current_step - warmup_iters) / max(1, total_steps - warmup_iters)
+        poly = (1.0 - progress) ** DEFAULTS.poly_power
+        return max(DEFAULTS.min_lr, poly)
+
+    return LambdaLR(optimizer, lr_lambda=lr_lambda)
 
 
 def run_smoke_test(
@@ -79,6 +105,7 @@ def run_smoke_test(
     set_seed(DEFAULTS.seed)
     model = build_model(variant=variant, task_mode=task_mode, num_classes=num_classes)
     optimizer = build_optimizer(model)
+    scheduler = build_scheduler(optimizer, total_steps=steps)
     multitask = task_mode != "single_task"
     dataset = DummySegmentationDataset(
         length=max(steps, DEFAULTS.batch_size),
@@ -116,6 +143,7 @@ def run_smoke_test(
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
+        scheduler.step()
 
         last_loss = float(loss.detach().cpu().item())
         last_accuracy = float(accuracy.detach().cpu().item())

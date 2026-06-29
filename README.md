@@ -12,14 +12,13 @@ Current direction
 
 Current scope
 
-- clean package structure
-- SegFormer-style decoder implementation
-- multitask model wiring
-- basic loss weighting utilities
+- real MiT B0 and B2 backbone presets
+- SegFormer decoder and dense segmentation heads
+- single-task, dual-head, and dual-decoder models
+- dummy dataset, smoke training path, and contract tests
 
 Next implementation focus
 
-1. complete MiT backbone implementation
-2. add dataset and training pipeline
-3. run smoke test with B0
-
+1. add real dataset adapters
+2. extend training and evaluation workflows
+3. benchmark multitask variants against the baseline

@@ -5,7 +5,11 @@ import torch
 
 class FixedLossWeighting:
     def __init__(self, weights: dict[str, float]) -> None:
+        self.initial_weights = dict(weights)
         self.weights = dict(weights)
+
+    def reset_weights(self) -> None:
+        self.weights = dict(self.initial_weights)
 
     def reduce(self, losses: dict[str, torch.Tensor]) -> torch.Tensor:
         return torch.stack([self.weights[key] * losses[key] for key in self.weights]).sum()
@@ -18,6 +22,11 @@ class DynamicWeightAverage:
         self.history: deque[dict[str, torch.Tensor]] = deque(maxlen=2)
         self.buffer: list[dict[str, torch.Tensor]] = []
         self.weights = {key: 1.0 for key in keys}
+
+    def reset_weights(self) -> None:
+        self.history.clear()
+        self.buffer = []
+        self.weights = {key: 1.0 for key in self.keys}
 
     def _update_weights(self) -> None:
         if self.buffer:
