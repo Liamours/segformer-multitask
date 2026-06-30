@@ -1,0 +1,35 @@
+{
+  "model": {
+    "variant": "mit_b2",
+    "task_mode": "dual_head",
+    "task_a_classes": 3,
+    "task_b_classes": 13
+  },
+  "data": {
+    "dataset_name": "folder",
+    "root_dir": "C:/path/to/dataset",
+    "train_split": "train.txt",
+    "val_split": "val.txt",
+    "image_dir": "images",
+    "task_a_mask_dir": "task_a_masks",
+    "task_b_mask_dir": "task_b_masks",
+    "image_suffix": ".png",
+    "mask_suffix": ".png",
+    "image_size": [512, 512],
+    "batch_size": 4,
+    "eval_batch_size": 4,
+    "train_num_workers": 0,
+    "val_num_workers": 0
+  },
+  "logging": {
+    "output_dir": "runs/dual_head",
+    "run_name": "dual_head",
+    "save_checkpoints": true,
+    "checkpoint_metric": "task_a_mean_dice",
+    "checkpoint_mode": "max"
+  },
+  "run": {
+    "epochs": 500,
+    "device": "cuda"
+  }
+}

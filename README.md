@@ -59,11 +59,31 @@ Training behavior
 
 - one shared trainer path for single-task and both multitask modes
 - per-epoch train and val evaluation
+- standalone checkpoint evaluation
 - optional JSONL metrics logging
 - optional latest and best checkpoints
 - differential learning rates
   - backbone `1e-5`
   - head `1e-4`
+- metrics
+  - loss
+  - pixel accuracy
+  - mean IoU
+  - mean Dice
+  - per-task metrics for multitask modes
+
+Train and evaluate
+
+```powershell
+uv run segformer-multitask-train --config configs/folder_single_task.json
+uv run segformer-multitask-evaluate --checkpoint runs/single_task/checkpoints/best.pt
+
+uv run segformer-multitask-train --config configs/folder_dual_head.json
+uv run segformer-multitask-evaluate --checkpoint runs/dual_head/checkpoints/best.pt
+
+uv run segformer-multitask-train --config configs/folder_dual_decoder.json
+uv run segformer-multitask-evaluate --checkpoint runs/dual_decoder/checkpoints/best.pt
+```
 
 Num workers policy
 

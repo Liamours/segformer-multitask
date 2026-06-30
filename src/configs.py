@@ -177,7 +177,20 @@ class ConfigHandler:
     def validate(config: ExperimentConfig) -> None:
         valid_task_modes = {"single_task", "dual_head", "dual_decoder"}
         valid_datasets = {"dummy", "folder"}
-        valid_checkpoint_metrics = {"loss", "pixel_accuracy"}
+        valid_checkpoint_metrics = {
+            "loss",
+            "pixel_accuracy",
+            "mean_iou",
+            "mean_dice",
+            "task_a_loss",
+            "task_b_loss",
+            "task_a_pixel_accuracy",
+            "task_b_pixel_accuracy",
+            "task_a_mean_iou",
+            "task_b_mean_iou",
+            "task_a_mean_dice",
+            "task_b_mean_dice",
+        }
         if config.model.variant not in SUPPORTED_MIT_SPECS:
             raise ValueError(f"Unsupported variant={config.model.variant}.")
         if config.model.task_mode not in valid_task_modes:
@@ -206,7 +219,8 @@ class ConfigHandler:
         if config.logging.checkpoint_mode not in {"min", "max"}:
             raise ValueError("logging.checkpoint_mode must be 'min' or 'max'.")
         if config.logging.checkpoint_metric not in valid_checkpoint_metrics:
-            raise ValueError("logging.checkpoint_metric must be one of: loss, pixel_accuracy.")
+            valid_names = ", ".join(sorted(valid_checkpoint_metrics))
+            raise ValueError(f"logging.checkpoint_metric must be one of: {valid_names}.")
         if config.logging.log_every_n_steps <= 0:
             raise ValueError("logging.log_every_n_steps must be positive.")
 

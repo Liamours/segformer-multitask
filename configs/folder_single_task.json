@@ -1,0 +1,33 @@
+{
+  "model": {
+    "variant": "mit_b2",
+    "task_mode": "single_task",
+    "num_classes": 3
+  },
+  "data": {
+    "dataset_name": "folder",
+    "root_dir": "C:/path/to/dataset",
+    "train_split": "train.txt",
+    "val_split": "val.txt",
+    "image_dir": "images",
+    "mask_dir": "masks",
+    "image_suffix": ".png",
+    "mask_suffix": ".png",
+    "image_size": [512, 512],
+    "batch_size": 4,
+    "eval_batch_size": 4,
+    "train_num_workers": 0,
+    "val_num_workers": 0
+  },
+  "logging": {
+    "output_dir": "runs/single_task",
+    "run_name": "single_task",
+    "save_checkpoints": true,
+    "checkpoint_metric": "mean_dice",
+    "checkpoint_mode": "max"
+  },
+  "run": {
+    "epochs": 500,
+    "device": "cuda"
+  }
+}

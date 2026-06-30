@@ -15,6 +15,10 @@ dependencies = [
   "tqdm>=4.66",
 ]
 
+[project.scripts]
+segformer-multitask-train = "src.train:main"
+segformer-multitask-evaluate = "src.evaluate:main"
+
 [dependency-groups]
 dev = [
   "pytest>=8.2",

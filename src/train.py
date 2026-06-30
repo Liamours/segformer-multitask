@@ -21,7 +21,7 @@ from .defaults import DEFAULTS
 from .heads import SegmentationHead
 from .logs import LogHandler, StepLog
 from .losses import multitask_segmentation_losses, segmentation_loss
-from .metrics import pixel_accuracy
+from .metrics import segmentation_scores
 from .models import DualDecoderSegFormer, DualHeadSegFormer, SingleTaskSegFormer
 from .types import TaskClassCounts
 from .utils import list_num_workers_options, recommend_num_workers, set_seed
@@ -228,13 +228,14 @@ class Trainer:
     def _move_batch(self, batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         return {key: value.to(self.device) for key, value in batch.items()}
 
-    def _compute_step(self, batch: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
+    def _compute_step(self, batch: dict[str, torch.Tensor]) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
         batch = self._move_batch(batch)
         outputs = self.model(batch["image"])
         if self.config.model.task_mode == "single_task":
             loss = segmentation_loss(outputs["logits"], batch["mask"])
-            accuracy = pixel_accuracy(outputs["logits"], batch["mask"])
-            return loss, accuracy
+            metrics = segmentation_scores(outputs["logits"], batch["mask"], self.config.model.num_classes)
+            metrics["loss"] = loss.detach()
+            return loss, metrics
 
         losses = multitask_segmentation_losses(
             outputs["task_a_logits"],
@@ -243,8 +244,29 @@ class Trainer:
             batch["task_b_mask"],
         )
         loss = self.weighting.reduce(losses)
-        accuracy = pixel_accuracy(outputs["task_a_logits"], batch["task_a_mask"])
-        return loss, accuracy
+        task_a_metrics = segmentation_scores(
+            outputs["task_a_logits"],
+            batch["task_a_mask"],
+            self.config.model.task_a_classes,
+        )
+        task_b_metrics = segmentation_scores(
+            outputs["task_b_logits"],
+            batch["task_b_mask"],
+            self.config.model.task_b_classes,
+        )
+        metrics = {
+            "loss": loss.detach(),
+            "task_a_loss": losses["task_a"].detach(),
+            "task_b_loss": losses["task_b"].detach(),
+        }
+        for key, value in task_a_metrics.items():
+            metrics[f"task_a_{key}"] = value
+        for key, value in task_b_metrics.items():
+            metrics[f"task_b_{key}"] = value
+        metrics["pixel_accuracy"] = (task_a_metrics["pixel_accuracy"] + task_b_metrics["pixel_accuracy"]) / 2.0
+        metrics["mean_iou"] = (task_a_metrics["mean_iou"] + task_b_metrics["mean_iou"]) / 2.0
+        metrics["mean_dice"] = (task_a_metrics["mean_dice"] + task_b_metrics["mean_dice"]) / 2.0
+        return loss, metrics
 
     def _run_epoch(self, loader: DataLoader, epoch: int, split: str, max_batches: int | None) -> dict[str, float]:
         is_train = split == "train"
@@ -253,8 +275,7 @@ class Trainer:
         else:
             self.model.eval()
 
-        total_loss = 0.0
-        total_accuracy = 0.0
+        metric_totals: dict[str, float] = {}
         num_batches = 0
 
         for batch_index, batch in enumerate(loader, start=1):
@@ -262,17 +283,19 @@ class Trainer:
                 break
 
             with torch.set_grad_enabled(is_train):
-                loss, accuracy = self._compute_step(batch)
+                loss, batch_metrics = self._compute_step(batch)
                 if is_train:
                     self.optimizer.zero_grad(set_to_none=True)
                     loss.backward()
                     self.optimizer.step()
                     self.scheduler.step()
 
-            loss_value = float(loss.detach().cpu().item())
-            accuracy_value = float(accuracy.detach().cpu().item())
-            total_loss += loss_value
-            total_accuracy += accuracy_value
+            batch_metric_values = {
+                key: float(value.detach().cpu().item())
+                for key, value in batch_metrics.items()
+            }
+            for key, value in batch_metric_values.items():
+                metric_totals[key] = metric_totals.get(key, 0.0) + value
             num_batches += 1
 
             if is_train and batch_index % self.config.logging.log_every_n_steps == 0:
@@ -281,8 +304,8 @@ class Trainer:
                         epoch=epoch,
                         step=batch_index,
                         split=split,
-                        loss=loss_value,
-                        pixel_accuracy=accuracy_value,
+                        loss=batch_metric_values["loss"],
+                        pixel_accuracy=batch_metric_values["pixel_accuracy"],
                         learning_rate_backbone=float(self.optimizer.param_groups[0]["lr"]),
                         learning_rate_head=float(self.optimizer.param_groups[1]["lr"]),
                     )
@@ -291,10 +314,7 @@ class Trainer:
         if num_batches == 0:
             raise ValueError(f"No batches were processed for split={split}.")
 
-        metrics = {
-            "loss": total_loss / num_batches,
-            "pixel_accuracy": total_accuracy / num_batches,
-        }
+        metrics = {key: value / num_batches for key, value in metric_totals.items()}
         self.logger.log_epoch(epoch, split, metrics)
         return metrics
 
@@ -422,7 +442,6 @@ def main() -> None:
     args = parse_args()
     config = load_config(args.config)
     result = Trainer(config).fit()
-    print(asdict(DEFAULTS))
     print(result)
 
 

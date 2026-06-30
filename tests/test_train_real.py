@@ -2,6 +2,7 @@ import numpy as np
 from PIL import Image
 
 from src.configs import ConfigHandler
+from src.evaluate import evaluate_checkpoint
 from src.train import Trainer
 from src.utils import list_num_workers_options, recommend_num_workers
 
@@ -61,10 +62,15 @@ def test_trainer_runs_on_real_single_task_folder_dataset(tmp_path):
 
     assert "train" in summary
     assert "val" in summary
+    assert "mean_iou" in summary["val"]
+    assert "mean_dice" in summary["val"]
     assert (tmp_path / "logs" / "checkpoints" / "latest.pt").exists()
+    eval_metrics = evaluate_checkpoint(tmp_path / "logs" / "checkpoints" / "latest.pt", max_batches=1)
+    assert eval_metrics["loss"] >= 0.0
+    assert "mean_iou" in eval_metrics
 
 
-def test_trainer_runs_on_real_multitask_folder_dataset(tmp_path):
+def test_trainer_runs_on_real_dual_decoder_folder_dataset(tmp_path):
     _make_multitask_dataset(tmp_path)
     config = ConfigHandler.from_dict(
         {
@@ -83,12 +89,20 @@ def test_trainer_runs_on_real_multitask_folder_dataset(tmp_path):
                 "eval_batch_size": 1,
                 "image_size": [32, 32],
             },
+            "logging": {"output_dir": str(tmp_path / "logs_dual_decoder"), "save_checkpoints": True},
             "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1},
         }
     )
     summary = Trainer(config).fit()
 
     assert summary["val"]["loss"] >= 0.0
+    assert "task_a_pixel_accuracy" in summary["val"]
+    assert "task_b_pixel_accuracy" in summary["val"]
+    assert "task_a_mean_iou" in summary["val"]
+    assert "task_b_mean_iou" in summary["val"]
+    eval_metrics = evaluate_checkpoint(tmp_path / "logs_dual_decoder" / "checkpoints" / "latest.pt", max_batches=1)
+    assert eval_metrics["task_a_loss"] >= 0.0
+    assert eval_metrics["task_b_loss"] >= 0.0
 
 
 def test_trainer_runs_on_real_dual_head_folder_dataset(tmp_path):
@@ -118,7 +132,14 @@ def test_trainer_runs_on_real_dual_head_folder_dataset(tmp_path):
 
     assert summary["train"]["loss"] >= 0.0
     assert summary["val"]["pixel_accuracy"] >= 0.0
+    assert "task_a_pixel_accuracy" in summary["val"]
+    assert "task_b_pixel_accuracy" in summary["val"]
+    assert "task_a_mean_dice" in summary["val"]
+    assert "task_b_mean_dice" in summary["val"]
     assert (tmp_path / "logs_dual_head" / "checkpoints" / "latest.pt").exists()
+    eval_metrics = evaluate_checkpoint(tmp_path / "logs_dual_head" / "checkpoints" / "latest.pt", max_batches=1)
+    assert eval_metrics["task_a_loss"] >= 0.0
+    assert eval_metrics["task_b_loss"] >= 0.0
 
 
 def test_checkpoint_selection_supports_loss_min_mode(tmp_path):

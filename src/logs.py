@@ -65,8 +65,9 @@ class LogHandler:
     def log_epoch(self, epoch: int, split: str, metrics: dict[str, float]) -> None:
         payload = {"epoch": epoch, "split": split, **metrics}
         self.history.append(payload)
+        metric_text = " ".join(f"{key}={value:.4f}" for key, value in sorted(metrics.items()))
         self.log_message(
-            f"[{split}-epoch] epoch={epoch} loss={metrics['loss']:.4f} pixel_accuracy={metrics['pixel_accuracy']:.4f}"
+            f"[{split}-epoch] epoch={epoch} {metric_text}"
         )
         if self.metrics_path is not None:
             with self.metrics_path.open("a", encoding="utf-8") as handle:
