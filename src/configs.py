@@ -177,6 +177,7 @@ class ConfigHandler:
     def validate(config: ExperimentConfig) -> None:
         valid_task_modes = {"single_task", "dual_head", "dual_decoder"}
         valid_datasets = {"dummy", "folder"}
+        valid_checkpoint_metrics = {"loss", "pixel_accuracy"}
         if config.model.variant not in SUPPORTED_MIT_SPECS:
             raise ValueError(f"Unsupported variant={config.model.variant}.")
         if config.model.task_mode not in valid_task_modes:
@@ -190,12 +191,24 @@ class ConfigHandler:
         if config.model.task_mode != "single_task":
             if config.model.task_a_classes <= 0 or config.model.task_b_classes <= 0:
                 raise ValueError("task_a_classes and task_b_classes must be positive for multitask modes.")
+        if config.model.decoder_dim <= 0:
+            raise ValueError("model.decoder_dim must be positive.")
+        if config.model.decoder_dropout < 0.0 or config.model.decoder_dropout >= 1.0:
+            raise ValueError("model.decoder_dropout must be in [0.0, 1.0).")
+        if config.data.image_size[0] <= 0 or config.data.image_size[1] <= 0:
+            raise ValueError("data.image_size must contain positive values.")
         if config.data.batch_size <= 0 or config.data.eval_batch_size <= 0:
             raise ValueError("batch sizes must be positive.")
+        if config.data.train_num_workers < 0 or config.data.val_num_workers < 0:
+            raise ValueError("num_workers must be non-negative.")
         if config.run.epochs <= 0:
             raise ValueError("run.epochs must be positive.")
         if config.logging.checkpoint_mode not in {"min", "max"}:
             raise ValueError("logging.checkpoint_mode must be 'min' or 'max'.")
+        if config.logging.checkpoint_metric not in valid_checkpoint_metrics:
+            raise ValueError("logging.checkpoint_metric must be one of: loss, pixel_accuracy.")
+        if config.logging.log_every_n_steps <= 0:
+            raise ValueError("logging.log_every_n_steps must be positive.")
 
     @staticmethod
     def _merge_dataclass(instance: Any, payload: dict[str, Any]) -> Any:

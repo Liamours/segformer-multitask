@@ -37,3 +37,12 @@ def test_config_handler_requires_root_for_folder_dataset():
         assert "root_dir" in str(error)
     else:
         raise AssertionError("Expected ValueError for missing root_dir.")
+
+
+def test_config_handler_rejects_invalid_checkpoint_metric():
+    try:
+        ConfigHandler.from_dict({"logging": {"checkpoint_metric": "dice"}})
+    except ValueError as error:
+        assert "checkpoint_metric" in str(error)
+    else:
+        raise AssertionError("Expected ValueError for invalid checkpoint_metric.")

@@ -91,6 +91,65 @@ def test_trainer_runs_on_real_multitask_folder_dataset(tmp_path):
     assert summary["val"]["loss"] >= 0.0
 
 
+def test_trainer_runs_on_real_dual_head_folder_dataset(tmp_path):
+    _make_multitask_dataset(tmp_path)
+    config = ConfigHandler.from_dict(
+        {
+            "model": {
+                "variant": "mit_b2",
+                "task_mode": "dual_head",
+                "task_a_classes": 5,
+                "task_b_classes": 6,
+            },
+            "data": {
+                "dataset_name": "folder",
+                "root_dir": str(tmp_path),
+                "train_split": "train.txt",
+                "val_split": "val.txt",
+                "batch_size": 1,
+                "eval_batch_size": 1,
+                "image_size": [32, 32],
+            },
+            "logging": {"output_dir": str(tmp_path / "logs_dual_head"), "save_checkpoints": True},
+            "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1},
+        }
+    )
+    summary = Trainer(config).fit()
+
+    assert summary["train"]["loss"] >= 0.0
+    assert summary["val"]["pixel_accuracy"] >= 0.0
+    assert (tmp_path / "logs_dual_head" / "checkpoints" / "latest.pt").exists()
+
+
+def test_checkpoint_selection_supports_loss_min_mode(tmp_path):
+    _make_single_task_dataset(tmp_path)
+    config = ConfigHandler.from_dict(
+        {
+            "model": {"variant": "mit_b0", "task_mode": "single_task", "num_classes": 5},
+            "data": {
+                "dataset_name": "folder",
+                "root_dir": str(tmp_path),
+                "train_split": "train.txt",
+                "val_split": "val.txt",
+                "batch_size": 1,
+                "eval_batch_size": 1,
+                "image_size": [32, 32],
+            },
+            "logging": {
+                "output_dir": str(tmp_path / "logs_loss_mode"),
+                "save_checkpoints": True,
+                "checkpoint_metric": "loss",
+                "checkpoint_mode": "min",
+            },
+            "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1},
+        }
+    )
+    summary = Trainer(config).fit()
+
+    assert summary["best_checkpoint_path"] is not None
+    assert (tmp_path / "logs_loss_mode" / "checkpoints" / "best.pt").exists()
+
+
 def test_num_workers_policy_outputs_candidates():
     options = list_num_workers_options(cpu_count=8)
     recommended = recommend_num_workers(batch_size=4, cpu_count=8)

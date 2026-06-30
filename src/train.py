@@ -1,3 +1,4 @@
+import argparse
 from dataclasses import asdict
 from pathlib import Path
 
@@ -411,8 +412,15 @@ def load_config(path: str | None = None) -> ExperimentConfig:
     return ConfigHandler.from_json(path)
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Train or evaluate SegFormer multitask models.")
+    parser.add_argument("--config", type=str, default=None, help="Path to a JSON config file.")
+    return parser.parse_args()
+
+
 def main() -> None:
-    config = load_config()
+    args = parse_args()
+    config = load_config(args.config)
     result = Trainer(config).fit()
     print(asdict(DEFAULTS))
     print(result)
