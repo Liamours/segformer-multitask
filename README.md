@@ -8,13 +8,14 @@ Current direction
 - single-task baseline
 - dual-head multitask variant
 - dual-decoder multitask variant
+- dual-fuse multitask variant: shared per-scale projections, task-specific fuse and head
 - flexible backbone presets such as B0 to B5
 
 Current scope
 
 - real MiT B0 to B5 backbone presets
 - SegFormer decoder and dense segmentation heads
-- single-task, dual-head, and dual-decoder models
+- single-task, dual-head, dual-decoder, and dual-fuse models
 - real folder-based dataset loading for single-task and multitask segmentation
 - config-driven training, evaluation, logging, and checkpointing
 - dummy dataset only for smoke tests and unit tests
@@ -51,6 +52,7 @@ Config surface
   - `single_task`
   - `dual_head`
   - `dual_decoder`
+  - `dual_fuse`
 - `data.dataset_name`
   - `dummy`
   - `folder`
@@ -83,6 +85,9 @@ uv run segformer-multitask-evaluate --checkpoint runs/dual_head/checkpoints/best
 
 uv run segformer-multitask-train --config configs/folder_dual_decoder.json
 uv run segformer-multitask-evaluate --checkpoint runs/dual_decoder/checkpoints/best.pt
+
+uv run segformer-multitask-train --config configs/folder_dual_fuse.json
+uv run segformer-multitask-evaluate --checkpoint runs/dual_fuse/checkpoints/best.pt
 ```
 
 Num workers policy

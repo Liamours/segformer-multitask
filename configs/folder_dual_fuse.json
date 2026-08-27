@@ -1,0 +1,61 @@
+{
+  "model": {
+    "variant": "mit_b2",
+    "task_mode": "dual_fuse",
+    "task_a_classes": 3,
+    "task_b_classes": 13,
+    "pretrained_hf_name": "nvidia/mit-b2"
+  },
+  "data": {
+    "dataset_name": "folder",
+    "root_dir": "C:/research/research-wbbs-multitask_uq/dataset/segformer/bs80k_multitask",
+    "train_split": "train.txt",
+    "val_split": "val.txt",
+    "test_split": "test.txt",
+    "image_dir": "images",
+    "task_a_mask_dir": "task_a_masks",
+    "task_b_mask_dir": "task_b_masks",
+    "image_suffix": ".png",
+    "mask_suffix": ".png",
+    "image_size": [1024, 512],
+    "batch_size": 4,
+    "eval_batch_size": 4,
+    "train_num_workers": 8,
+    "val_num_workers": 8,
+    "paired_views": true,
+    "anterior_suffix": "_0000",
+    "posterior_suffix": "_0001",
+    "normalize_mean": [0.485, 0.456, 0.406],
+    "normalize_std": [0.229, 0.224, 0.225]
+  },
+  "loss": {
+    "name": "dice_ce",
+    "ce_weight": 1.0,
+    "dice_weight": 1.0,
+    "task_a_weight": 0.8,
+    "task_b_weight": 0.2,
+    "ignore_index": 255
+  },
+  "logging": {
+    "output_dir": "C:/research/research-wbbs-multitask_uq/weights/dual_fuse",
+    "run_name": "dual_fuse",
+    "save_checkpoints": true,
+    "save_epoch_checkpoints": true,
+    "checkpoint_metric": "task_a_foreground_mean_dice",
+    "checkpoint_mode": "max"
+  },
+  "run": {
+    "epochs": 100,
+    "device": "cuda",
+    "amp": true,
+    "amp_dtype": "bf16",
+    "channels_last": true,
+    "allow_tf32": true,
+    "cudnn_benchmark": true,
+    "gradient_accumulation_steps": 1,
+    "early_stopping_patience": 15,
+    "early_stopping_metric": "task_a_foreground_mean_dice",
+    "early_stopping_mode": "max",
+    "early_stopping_min_delta": 0.0001
+  }
+}
