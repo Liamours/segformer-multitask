@@ -29,8 +29,8 @@ class TrainDefaults:
     task_a_classes: int = 4
     task_b_classes: int = 4
     epochs: int = 1
-    max_train_batches: int | None = 1
-    max_eval_batches: int | None = 1
+    max_train_batches: int | None = None
+    max_eval_batches: int | None = None
 
 
 DEFAULTS = TrainDefaults()

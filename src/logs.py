@@ -3,6 +3,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from tqdm import tqdm
+
 from .configs import ExperimentConfig
 
 
@@ -15,6 +17,10 @@ class StepLog:
     pixel_accuracy: float
     learning_rate_backbone: float
     learning_rate_head: float
+    class_0_dice: float | None = None
+    class_1_dice: float | None = None
+    class_2_dice: float | None = None
+    seconds_per_step: float | None = None
 
 
 class LogHandler:
@@ -25,6 +31,7 @@ class LogHandler:
         self.history: list[dict[str, Any]] = []
         self.metrics_path: Path | None = None
         self.summary_path: Path | None = None
+        self.preflight_path: Path | None = None
         self.checkpoint_dir: Path | None = None
 
         if self.output_dir is not None:
@@ -36,12 +43,13 @@ class LogHandler:
             if config.logging.write_jsonl:
                 self.metrics_path = self.output_dir / f"{self.run_name}_metrics.jsonl"
             self.summary_path = self.output_dir / f"{self.run_name}_summary.json"
+            self.preflight_path = self.output_dir / f"{self.run_name}_preflight.json"
             if config.logging.save_checkpoints:
                 self.checkpoint_dir = self.output_dir / "checkpoints"
                 self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     def log_message(self, message: str) -> None:
-        print(message)
+        tqdm.write(message)
 
     def log_worker_options(self, options: list[int], recommended: int) -> None:
         self.log_message(
@@ -52,12 +60,6 @@ class LogHandler:
     def log_step(self, step_log: StepLog) -> None:
         payload = asdict(step_log)
         self.history.append(payload)
-        self.log_message(
-            f"[{step_log.split}] epoch={step_log.epoch} step={step_log.step} "
-            f"loss={step_log.loss:.4f} pixel_accuracy={step_log.pixel_accuracy:.4f} "
-            f"lr_backbone={step_log.learning_rate_backbone:.8f} "
-            f"lr_head={step_log.learning_rate_head:.8f}"
-        )
         if self.metrics_path is not None:
             with self.metrics_path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(payload) + "\n")
@@ -80,4 +82,14 @@ class LogHandler:
             f"[summary] best_metric={summary.get('best_metric', 0.0):.4f} "
             f"final_train_loss={summary['train']['loss']:.4f} "
             f"final_val_loss={summary['val']['loss']:.4f}"
+        )
+
+    def write_preflight(self, report: dict[str, Any]) -> None:
+        if self.preflight_path is not None:
+            self.preflight_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        self.log_message(
+            "[preflight] "
+            f"train_batches={report['effective_train_batches']}/{report['total_train_batches']} "
+            f"val_batches={report['effective_val_batches']}/{report['total_val_batches']} "
+            f"epochs={report['epochs']} expected_train_steps={report['expected_train_steps']}"
         )

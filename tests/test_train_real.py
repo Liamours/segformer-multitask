@@ -3,7 +3,7 @@ from PIL import Image
 
 from src.configs import ConfigHandler
 from src.evaluate import evaluate_checkpoint
-from src.train import Trainer
+from src.train import Trainer, build_model
 from src.utils import list_num_workers_options, recommend_num_workers
 
 
@@ -55,7 +55,7 @@ def test_trainer_runs_on_real_single_task_folder_dataset(tmp_path):
                 "image_size": [32, 32],
             },
             "logging": {"output_dir": str(tmp_path / "logs"), "save_checkpoints": True},
-            "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1},
+            "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1, "allow_limited_batches": True},
         }
     )
     summary = Trainer(config).fit()
@@ -90,7 +90,7 @@ def test_trainer_runs_on_real_dual_decoder_folder_dataset(tmp_path):
                 "image_size": [32, 32],
             },
             "logging": {"output_dir": str(tmp_path / "logs_dual_decoder"), "save_checkpoints": True},
-            "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1},
+            "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1, "allow_limited_batches": True},
         }
     )
     summary = Trainer(config).fit()
@@ -125,7 +125,7 @@ def test_trainer_runs_on_real_dual_head_folder_dataset(tmp_path):
                 "image_size": [32, 32],
             },
             "logging": {"output_dir": str(tmp_path / "logs_dual_head"), "save_checkpoints": True},
-            "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1},
+            "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1, "allow_limited_batches": True},
         }
     )
     summary = Trainer(config).fit()
@@ -138,6 +138,41 @@ def test_trainer_runs_on_real_dual_head_folder_dataset(tmp_path):
     assert "task_b_mean_dice" in summary["val"]
     assert (tmp_path / "logs_dual_head" / "checkpoints" / "latest.pt").exists()
     eval_metrics = evaluate_checkpoint(tmp_path / "logs_dual_head" / "checkpoints" / "latest.pt", max_batches=1)
+    assert eval_metrics["task_a_loss"] >= 0.0
+    assert eval_metrics["task_b_loss"] >= 0.0
+
+
+def test_trainer_runs_on_real_dual_fuse_folder_dataset(tmp_path):
+    _make_multitask_dataset(tmp_path)
+    config = ConfigHandler.from_dict(
+        {
+            "model": {
+                "variant": "mit_b0",
+                "task_mode": "dual_fuse",
+                "task_a_classes": 5,
+                "task_b_classes": 6,
+            },
+            "data": {
+                "dataset_name": "folder",
+                "root_dir": str(tmp_path),
+                "train_split": "train.txt",
+                "val_split": "val.txt",
+                "batch_size": 1,
+                "eval_batch_size": 1,
+                "image_size": [32, 32],
+            },
+            "logging": {"output_dir": str(tmp_path / "logs_dual_fuse"), "save_checkpoints": True},
+            "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1, "allow_limited_batches": True},
+        }
+    )
+    summary = Trainer(config).fit()
+
+    assert summary["val"]["loss"] >= 0.0
+    assert "task_a_pixel_accuracy" in summary["val"]
+    assert "task_b_pixel_accuracy" in summary["val"]
+    assert "task_a_mean_iou" in summary["val"]
+    assert "task_b_mean_iou" in summary["val"]
+    eval_metrics = evaluate_checkpoint(tmp_path / "logs_dual_fuse" / "checkpoints" / "latest.pt", max_batches=1)
     assert eval_metrics["task_a_loss"] >= 0.0
     assert eval_metrics["task_b_loss"] >= 0.0
 
@@ -162,7 +197,7 @@ def test_checkpoint_selection_supports_loss_min_mode(tmp_path):
                 "checkpoint_metric": "loss",
                 "checkpoint_mode": "min",
             },
-            "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1},
+            "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1, "allow_limited_batches": True},
         }
     )
     summary = Trainer(config).fit()
@@ -171,9 +206,76 @@ def test_checkpoint_selection_supports_loss_min_mode(tmp_path):
     assert (tmp_path / "logs_loss_mode" / "checkpoints" / "best.pt").exists()
 
 
+def test_training_can_resume_from_epoch_checkpoint(tmp_path):
+    _make_single_task_dataset(tmp_path)
+    base_payload = {
+        "model": {"variant": "mit_b0", "task_mode": "single_task", "num_classes": 5},
+        "data": {
+            "dataset_name": "folder",
+            "root_dir": str(tmp_path),
+            "train_split": "train.txt",
+            "val_split": "val.txt",
+            "batch_size": 1,
+            "eval_batch_size": 1,
+            "image_size": [32, 32],
+        },
+        "logging": {
+            "output_dir": str(tmp_path / "logs_resume"),
+            "save_checkpoints": True,
+            "save_epoch_checkpoints": True,
+            "checkpoint_metric": "loss",
+            "checkpoint_mode": "min",
+        },
+        "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1, "allow_limited_batches": True},
+    }
+    first_summary = Trainer(ConfigHandler.from_dict(base_payload)).fit()
+    epoch_1 = tmp_path / "logs_resume" / "checkpoints" / "epoch_0001.pt"
+
+    resume_payload = {
+        **base_payload,
+        "run": {
+            "epochs": 2,
+            "max_train_batches": 1,
+            "max_eval_batches": 1,
+            "allow_limited_batches": True,
+            "resume_checkpoint": str(epoch_1),
+        },
+    }
+    second_summary = Trainer(ConfigHandler.from_dict(resume_payload)).fit()
+
+    assert first_summary["completed_epochs"] == 1
+    assert second_summary["start_epoch"] == 2
+    assert second_summary["completed_epochs"] == 2
+    assert epoch_1.exists()
+    assert (tmp_path / "logs_resume" / "checkpoints" / "epoch_0002.pt").exists()
+
+
+def test_trainer_preflight_reports_full_batches_for_real_config():
+    payload = ConfigHandler.from_json("configs/folder_single_task_100epochs.json").to_dict()
+    payload["run"]["device"] = "cpu"
+    payload["logging"]["output_dir"] = None
+    config = ConfigHandler.from_dict(payload)
+    trainer = Trainer(config)
+
+    assert trainer.preflight_report["effective_train_batches"] == 585
+    assert trainer.preflight_report["effective_val_batches"] == 73
+    assert trainer.preflight_report["expected_train_steps"] == 58500
+
+
 def test_num_workers_policy_outputs_candidates():
     options = list_num_workers_options(cpu_count=8)
     recommended = recommend_num_workers(batch_size=4, cpu_count=8)
 
     assert options == [0, 1, 2, 4, 6]
     assert recommended == 6
+
+
+def test_frozen_backbone_stays_in_eval_mode_during_training():
+    model = build_model(variant="mit_b0", task_mode="single_task", num_classes=3)
+
+    model.freeze_backbone()
+    model.train()
+
+    assert model.training
+    assert not model.backbone.training
+    assert all(not parameter.requires_grad for parameter in model.backbone.parameters())

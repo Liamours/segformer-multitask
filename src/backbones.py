@@ -378,3 +378,39 @@ class MixVisionTransformer(PyramidBackbone):
             x = x.transpose(1, 2).reshape(x.shape[0], x.shape[2], height, width)
             outputs.append(x)
         return tuple(outputs)
+
+
+class HuggingFacePretrainedMiT(PyramidBackbone):
+    """PyramidBackbone wrapping an ImageNet-pretrained HuggingFace SegformerModel encoder.
+
+    Reuses HF's own forward pass verbatim instead of remapping weights into
+    MixVisionTransformer, so there is no shape-compatible-but-numerically-wrong load risk.
+    """
+
+    def __init__(self, hf_name: str, spec: MiTSpec) -> None:
+        super().__init__()
+        try:
+            from transformers import SegformerModel
+        except ImportError as error:
+            raise ImportError("transformers is required for a HuggingFace-pretrained backbone.") from error
+
+        self.spec = spec
+        self.hf_name = hf_name
+        self.model, self.loading_info = SegformerModel.from_pretrained(hf_name, output_loading_info=True)
+        actual_channels = tuple(self.model.config.hidden_sizes)
+        if actual_channels != spec.stage_channels:
+            raise ValueError(
+                f"Pretrained checkpoint {hf_name} has stage channels {actual_channels}, "
+                f"expected {spec.stage_channels} for variant={spec.name}."
+            )
+
+    @property
+    def out_channels(self) -> tuple[int, int, int, int]:
+        return self.spec.stage_channels
+
+    def forward(self, x: torch.Tensor) -> FeaturePyramid:
+        outputs = self.model(pixel_values=x, output_hidden_states=True)
+        return tuple(outputs.hidden_states)
+
+    def patch_embedding_weight(self) -> torch.Tensor:
+        return self.model.stages[0].patch_embeddings.proj.weight

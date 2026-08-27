@@ -1,11 +1,12 @@
 import json
 import subprocess
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
 
-REPO_ROOT = "C:\\Users\\lulay\\Desktop\\segformer-multitask\\repo\\segformer-multitask"
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_train_entrypoint_accepts_config_path(tmp_path):
@@ -19,6 +20,7 @@ def test_train_entrypoint_accepts_config_path(tmp_path):
             "epochs": 1,
             "max_train_batches": 1,
             "max_eval_batches": 1,
+            "allow_limited_batches": True,
         },
         "logging": {
             "output_dir": str(tmp_path / "logs"),
@@ -54,6 +56,7 @@ def _make_multitask_dataset(root) -> None:
     (root / "task_b_masks").mkdir()
     (root / "train.txt").write_text("a\nb\n", encoding="utf-8")
     (root / "val.txt").write_text("b\n", encoding="utf-8")
+    (root / "test.txt").write_text("a\n", encoding="utf-8")
     _write_rgb(root / "images" / "a.png", 32)
     _write_rgb(root / "images" / "b.png", 64)
     _write_mask(root / "task_a_masks" / "a.png", 1)
@@ -76,6 +79,7 @@ def test_train_and_evaluate_cli_for_dual_head_folder_dataset(tmp_path):
             "root_dir": str(tmp_path),
             "train_split": "train.txt",
             "val_split": "val.txt",
+            "test_split": "test.txt",
             "batch_size": 1,
             "eval_batch_size": 1,
             "image_size": [32, 32],
@@ -85,9 +89,95 @@ def test_train_and_evaluate_cli_for_dual_head_folder_dataset(tmp_path):
             "save_checkpoints": True,
             "write_jsonl": False,
         },
-        "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1},
+        "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1, "allow_limited_batches": True},
     }
     config_path = tmp_path / "dual_head.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+
+    subprocess.run(
+        ["uv", "run", "segformer-multitask-train", "--config", str(config_path)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    checkpoint_path = tmp_path / "logs" / "checkpoints" / "latest.pt"
+    eval_output_path = tmp_path / "eval.json"
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "segformer-multitask-evaluate",
+            "--checkpoint",
+            str(checkpoint_path),
+            "--max-batches",
+            "1",
+            "--output",
+            str(eval_output_path),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert "task_a_pixel_accuracy" in result.stdout
+    assert "task_b_pixel_accuracy" in result.stdout
+    assert eval_output_path.is_file()
+    report_path = eval_output_path.with_suffix(".md")
+    assert report_path.is_file()
+    report_text = report_path.read_text(encoding="utf-8")
+    assert "task_a_pixel_accuracy" in report_text
+    assert "| Metric | Value |" in report_text
+
+    test_result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "segformer-multitask-evaluate",
+            "--checkpoint",
+            str(checkpoint_path),
+            "--split",
+            "test",
+            "--max-batches",
+            "1",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert '"split": "test"' in test_result.stdout
+
+
+def test_train_and_evaluate_cli_for_dual_fuse_folder_dataset(tmp_path):
+    _make_multitask_dataset(tmp_path)
+    config = {
+        "model": {
+            "variant": "mit_b0",
+            "task_mode": "dual_fuse",
+            "task_a_classes": 5,
+            "task_b_classes": 6,
+        },
+        "data": {
+            "dataset_name": "folder",
+            "root_dir": str(tmp_path),
+            "train_split": "train.txt",
+            "val_split": "val.txt",
+            "test_split": "test.txt",
+            "batch_size": 1,
+            "eval_batch_size": 1,
+            "image_size": [32, 32],
+        },
+        "logging": {
+            "output_dir": str(tmp_path / "logs"),
+            "save_checkpoints": True,
+            "write_jsonl": False,
+        },
+        "run": {"epochs": 1, "max_train_batches": 1, "max_eval_batches": 1, "allow_limited_batches": True},
+    }
+    config_path = tmp_path / "dual_fuse.json"
     config_path.write_text(json.dumps(config), encoding="utf-8")
 
     subprocess.run(

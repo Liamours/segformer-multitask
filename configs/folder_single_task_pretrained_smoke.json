@@ -2,7 +2,10 @@
   "model": {
     "variant": "mit_b2",
     "task_mode": "single_task",
-    "num_classes": 3
+    "num_classes": 3,
+    "pretrained_path": null,
+    "pretrained_hf_name": "nvidia/mit-b2",
+    "freeze_backbone": false
   },
   "data": {
     "dataset_name": "folder",
@@ -17,13 +20,23 @@
     "image_size": [1024, 512],
     "batch_size": 4,
     "eval_batch_size": 4,
-    "train_num_workers": 8,
-    "val_num_workers": 8,
+    "train_num_workers": 0,
+    "val_num_workers": 0,
     "paired_views": true,
     "anterior_suffix": "_0000",
     "posterior_suffix": "_0001",
     "normalize_mean": [0.485, 0.456, 0.406],
     "normalize_std": [0.229, 0.224, 0.225]
+  },
+  "optimizer": {
+    "name": "adamw",
+    "learning_rate_backbone": 0.00001,
+    "learning_rate_head": 0.0001,
+    "betas": [0.9, 0.999],
+    "weight_decay": 0.01
+  },
+  "scheduler": {
+    "warmup_iters": 20
   },
   "loss": {
     "name": "dice_ce",
@@ -34,15 +47,25 @@
     "ignore_index": 255
   },
   "logging": {
-    "output_dir": "C:/research/research-wbbs-multitask_uq/weights/single_task",
-    "run_name": "single_task",
+    "output_dir": "C:/research/research-wbbs-multitask_uq/weights/single_task_pretrained_smoke",
+    "run_name": "single_task_pretrained_smoke",
     "save_checkpoints": true,
     "save_epoch_checkpoints": true,
     "checkpoint_metric": "foreground_mean_dice",
-    "checkpoint_mode": "max"
+    "checkpoint_mode": "max",
+    "log_every_n_steps": 50
   },
   "run": {
-    "epochs": 2,
-    "device": "cuda"
+    "epochs": 1,
+    "device": "cuda",
+    "max_train_batches": 200,
+    "max_eval_batches": 20,
+    "allow_limited_batches": true,
+    "amp": true,
+    "amp_dtype": "bf16",
+    "channels_last": true,
+    "allow_tf32": true,
+    "cudnn_benchmark": true,
+    "gradient_accumulation_steps": 1
   }
 }

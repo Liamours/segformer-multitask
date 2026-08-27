@@ -17,3 +17,9 @@ def test_smoke_dual_decoder_runs():
     result = run_smoke_test(task_mode="dual_decoder", steps=1)
     assert "loss" in result
     assert "pixel_accuracy" in result
+
+
+def test_smoke_dual_fuse_runs():
+    result = run_smoke_test(task_mode="dual_fuse", steps=1)
+    assert "loss" in result
+    assert "pixel_accuracy" in result
