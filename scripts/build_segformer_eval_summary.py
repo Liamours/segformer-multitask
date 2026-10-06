@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 RUNS = (
-    ("single_task", "single_task_100epochs", "SegFormer, single-task"),
+    ("single_task", "single_task", "SegFormer, single-task"),
     ("multi_task_head", "dual_head", "SegFormer, multi-task-head"),
     ("multi_task_decoder", "dual_decoder", "SegFormer, multi-task-decoder"),
 )
@@ -54,8 +54,8 @@ Class indices: lesion 1 = benign, 2 = malignant. Bone classes follow
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--weights-root", default=r"C:\research\research-wbbs-multitask_uq\weights")
-    parser.add_argument("--output-stem", default=r"C:\research\research-wbbs-multitask_uq\analyses\evaluations\segformer_eval_summary")
+    parser.add_argument("--weights-root", default=r"C:\rifqi\research-wbbs-multitask_uq\weights")
+    parser.add_argument("--output-stem", default=r"C:\rifqi\research-wbbs-multitask_uq\analyses\evaluations\segformer_eval_summary")
     return parser.parse_args()
 
 

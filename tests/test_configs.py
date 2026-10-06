@@ -49,7 +49,7 @@ def test_config_handler_rejects_invalid_checkpoint_metric():
 
 
 def test_real_training_configs_do_not_inherit_smoke_batch_limits():
-    config = ConfigHandler.from_json("configs/folder_single_task_100epochs.json")
+    config = ConfigHandler.from_json("configs/folder_single_task.json")
 
     assert config.run.max_train_batches is None
     assert config.run.max_eval_batches is None

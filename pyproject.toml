@@ -14,6 +14,7 @@ dependencies = [
   "torch>=2.2",
   "tqdm>=4.66",
   "transformers>=4.41",
+  "wbbs-lguq",
 ]
 
 [project.scripts]
@@ -26,11 +27,12 @@ dev = [
 ]
 
 [tool.uv.sources]
-torch = { index = "pytorch-cu126" }
+torch = { index = "pytorch-cu128" }
+wbbs-lguq = { path = "../segmentation_uncertainty_quantification", editable = true }
 
 [[tool.uv.index]]
-name = "pytorch-cu126"
-url = "https://download.pytorch.org/whl/cu126"
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [tool.setuptools.packages.find]

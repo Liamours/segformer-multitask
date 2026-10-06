@@ -251,7 +251,7 @@ def test_training_can_resume_from_epoch_checkpoint(tmp_path):
 
 
 def test_trainer_preflight_reports_full_batches_for_real_config():
-    payload = ConfigHandler.from_json("configs/folder_single_task_100epochs.json").to_dict()
+    payload = ConfigHandler.from_json("configs/folder_single_task.json").to_dict()
     payload["run"]["device"] = "cpu"
     payload["logging"]["output_dir"] = None
     config = ConfigHandler.from_dict(payload)

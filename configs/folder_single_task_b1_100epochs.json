@@ -9,7 +9,7 @@
   },
   "data": {
     "dataset_name": "folder",
-    "root_dir": "C:/research/research-wbbs-multitask_uq/dataset/segformer/bs80k_lesion",
+    "root_dir": "C:/rifqi/research-wbbs-multitask_uq/dataset/segformer/bs80k_lesion",
     "train_split": "train.txt",
     "val_split": "val.txt",
     "test_split": "test.txt",
@@ -53,7 +53,7 @@
     "ignore_index": 255
   },
   "logging": {
-    "output_dir": "C:/research/research-wbbs-multitask_uq/weights/single_task_b1_100epochs",
+    "output_dir": "C:/rifqi/research-wbbs-multitask_uq/weights/single_task_b1_100epochs",
     "run_name": "single_task_b1_100epochs",
     "log_every_n_steps": 50,
     "write_jsonl": true,
