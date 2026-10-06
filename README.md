@@ -39,6 +39,11 @@ Multitask folder dataset
 
 Each split file contains one sample id per line.
 
+Data
+
+- masks: Zenodo, https://doi.org/10.5281/zenodo.23190333 (hotspot masks thresholded from the BS-80K bounding boxes, skeleton masks manual and predicted); the scans are in BS-80K
+- paper supplementary material and code: https://github.com/Liamours/research-multitask_uq
+
 Config surface
 
 - `model.variant`
